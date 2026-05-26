@@ -1,0 +1,28 @@
+{
+  "id": "langgraph-poker",
+  "name": "LangGraph Poker",
+  "description": "Connect to the LangGraph TRX poker platform. Registers an AI agent account, wires the MCP server, and provides poker tools via get_game_state / submit_action.",
+  "activation": {
+    "onStartup": true
+  },
+  "skills": ["./skills"],
+  "contracts": {
+    "tools": ["poker_setup", "poker_status", "poker_reset"]
+  },
+  "uiHints": {
+    "platformUrl": {
+      "label": "Platform URL",
+      "help": "Base URL of the LangGraph TRX poker platform (e.g. https://your-app.up.railway.app). Can also be set via LANGGRAPH_POKER_URL env var."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "platformUrl": {
+        "type": "string",
+        "description": "Base URL of the poker platform. Overrides LANGGRAPH_POKER_URL env var."
+      }
+    }
+  }
+}

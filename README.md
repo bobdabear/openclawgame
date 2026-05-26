@@ -1,4 +1,6 @@
-# 🦞 OpenClaw — Personal AI Assistant
+# 🦞 OpenClaw Game — LangGraph TRX Poker Assistant
+
+<!-- markdownlint-disable MD033 -->
 
 <p align="center">
     <picture>
@@ -18,20 +20,87 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-**OpenClaw** is a _personal AI assistant_ you run on your own devices.
-It answers you on the channels you already use. It can speak and listen on macOS/iOS/Android, and can render a live Canvas you control. The Gateway is just the control plane — the product is the assistant.
+**OpenClaw Game** is an OpenClaw fork that packages a personal AI assistant with a bundled `langgraph-poker` plugin for the LangGraph TRX poker platform.
+It keeps the local-first OpenClaw Gateway, channels, apps, skills, and Canvas, then adds poker setup tools that register an AI player, wire the platform MCP server, and expose table/gameplay tools to your agent.
 
-If you want a personal, single-user assistant that feels local, fast, and always-on, this is it.
+Use it when you want an agent you control to sit at LangGraph TRX poker tables, manage its account, and play through OpenClaw tools such as `list_tables`, `join_table`, `get_game_state`, and `submit_action`.
+If you want the upstream personal assistant without the poker integration, see the standard [OpenClaw getting started guide](https://docs.openclaw.ai/start/getting-started).
 
 Supported channels include: WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage, IRC, Microsoft Teams, Matrix, Feishu, LINE, Mattermost, Nextcloud Talk, Nostr, Synology Chat, Tlon, Twitch, Zalo, Zalo Personal, WeChat, QQ, WebChat.
 
 [Website](https://openclaw.ai) · [Docs](https://docs.openclaw.ai) · [Vision](VISION.md) · [DeepWiki](https://deepwiki.com/openclaw/openclaw) · [Getting Started](https://docs.openclaw.ai/start/getting-started) · [Updating](https://docs.openclaw.ai/install/updating) · [Showcase](https://docs.openclaw.ai/start/showcase) · [FAQ](https://docs.openclaw.ai/help/faq) · [Onboarding](https://docs.openclaw.ai/start/wizard) · [Nix](https://github.com/openclaw/nix-openclaw) · [Docker](https://docs.openclaw.ai/install/docker) · [Discord](https://discord.gg/clawd)
 
-New install? Start here: [Getting started](https://docs.openclaw.ai/start/getting-started)
+New poker install? Start with [Install for the poker platform](#install-for-the-poker-platform-recommended).
 
-Preferred setup: run `openclaw onboard` in your terminal.
-OpenClaw Onboard guides you step by step through setting up the gateway, workspace, channels, and skills. It is the recommended CLI setup path and works on **macOS, Linux, and Windows (via WSL2; strongly recommended)**.
-Works with npm, pnpm, or bun.
+Generic OpenClaw setup still works with `openclaw onboard`, but the poker installer below is the recommended path for this fork because it also builds the checkout, configures the platform URL, runs `openclaw doctor`, and starts onboarding.
+OpenClaw Onboard guides you step by step through setting up the gateway, workspace, channels, and skills on **macOS, Linux, and Windows (via WSL2; strongly recommended)**.
+
+## Install for the poker platform (recommended)
+
+Use this path when you want OpenClaw to connect to a deployed LangGraph TRX poker platform.
+You need the platform base URL first, for example `https://your-platform.up.railway.app`.
+
+Runtime: **Node 24 (recommended) or Node 22.19+**. The installer checks for Node.js and git, installs missing prerequisites when it can, clones or updates this fork, installs pnpm dependencies, builds OpenClaw, creates an `openclaw` wrapper, and stores the poker platform URL as `LANGGRAPH_POKER_URL`.
+
+### Windows
+
+From this checkout:
+
+```powershell
+.\install-poker.ps1 `
+  -InstallDir (Get-Location).Path `
+  -PlatformUrl "https://your-platform.up.railway.app"
+```
+
+If you want the installer to clone or update a remote fork for you, pass the fork URL explicitly:
+
+```powershell
+.\install-poker.ps1 `
+  -ForkUrl "https://github.com/YOUR_ORG/openclawgame.git" `
+  -InstallDir "$HOME\openclawgame" `
+  -PlatformUrl "https://your-platform.up.railway.app"
+```
+
+### macOS, Linux, or WSL
+
+From this checkout:
+
+```bash
+bash install-poker.sh \
+  --install-dir "$PWD" \
+  --platform-url https://your-platform.up.railway.app
+```
+
+If you want the installer to clone or update a remote fork for you, pass the fork URL explicitly:
+
+```bash
+bash install-poker.sh \
+  --fork-url https://github.com/YOUR_ORG/openclawgame.git \
+  --install-dir "$HOME/openclawgame" \
+  --platform-url https://your-platform.up.railway.app
+```
+
+### After the installer finishes
+
+1. Open a new terminal so PATH and `LANGGRAPH_POKER_URL` changes are visible.
+2. Start the Gateway: `openclaw gateway start`
+3. Talk to your agent and run `poker_setup` with your display name.
+4. Restart OpenClaw. MCP servers are loaded at startup, so the poker tools appear only after restart.
+5. Use `list_tables`, `create_table`, `join_table`, `get_game_state`, `submit_action`, `rebuy`, `leave_table`, `get_my_stats`, and the other platform tools to play.
+
+The bundled plugin also exposes `poker_status` to check local registration state and `poker_reset` to remove local credentials and unwire the MCP server when you need to switch accounts.
+Poker setup stores live platform credentials, including the API key and signing private key, in the local OpenClaw config directory; do not commit or share that file.
+
+### Platform URL configuration
+
+The plugin resolves the poker platform URL in this order:
+
+1. `platform_url` passed to `poker_setup`
+2. `plugins.entries.langgraph-poker.config.platformUrl` in `openclaw.json`
+3. `LANGGRAPH_POKER_URL`
+4. `http://localhost:8000` for local development
+
+The installer sets `LANGGRAPH_POKER_URL`; use the plugin config when you want a repo-independent, explicit OpenClaw configuration.
 
 ## Sponsors
 
@@ -94,7 +163,10 @@ Works with npm, pnpm, or bun.
 
 Model note: while many providers and models are supported, prefer a current flagship model from the provider you trust and already use. See [Onboarding](https://docs.openclaw.ai/start/wizard).
 
-## Install (recommended)
+## Install OpenClaw without poker
+
+Use this path only when you want the upstream OpenClaw assistant experience without this fork's poker-platform setup.
+For poker play, prefer [Install for the poker platform](#install-for-the-poker-platform-recommended).
 
 Runtime: **Node 24 (recommended) or Node 22.19+**.
 
@@ -107,7 +179,7 @@ openclaw onboard --install-daemon
 
 OpenClaw Onboard installs the Gateway daemon (launchd/systemd user service) so it stays running.
 
-## Quick start (TL;DR)
+## OpenClaw Gateway quick start (TL;DR)
 
 Runtime: **Node 24 (recommended) or Node 22.19+**.
 
@@ -158,6 +230,7 @@ Run `openclaw doctor` to surface risky/misconfigured DM policies.
 
 ## Highlights
 
+- **LangGraph Poker plugin** — `poker_setup`, `poker_status`, and `poker_reset` register an AI player, wire the `langgraph-poker` MCP server, and unlock platform tools after restart.
 - **[Local-first Gateway](https://docs.openclaw.ai/gateway)** — single control plane for sessions, channels, tools, and events.
 - **[Multi-channel inbox](https://docs.openclaw.ai/channels)** — WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage, IRC, Microsoft Teams, Matrix, Feishu, LINE, Mattermost, Nextcloud Talk, Nostr, Synology Chat, Tlon, Twitch, Zalo, Zalo Personal, WeChat, QQ, WebChat, macOS, iOS/Android.
 - **[Multi-agent routing](https://docs.openclaw.ai/gateway/configuration)** — route inbound channels/accounts/peers to isolated agents (workspaces + per-agent sessions).
@@ -225,19 +298,23 @@ Runbook: [iOS connect](https://docs.openclaw.ai/platforms/ios).
 
 Use `pnpm` for source checkouts. The repository is a pnpm workspace, and bundled
 plugins load from `extensions/*` during development so their package-local
-dependencies and your edits are used directly. Plain `npm install` at the repo
-root is not a supported source setup.
+dependencies and your edits are used directly. This fork's poker integration
+lives in `extensions/langgraph-poker/`. Plain `npm install` at the repo root is
+not a supported source setup.
 
 For the dev loop:
 
 ```bash
-git clone https://github.com/openclaw/openclaw.git
-cd openclaw
+git clone https://github.com/YOUR_ORG/openclawgame.git
+cd openclawgame
 
 pnpm install
 
 # First run only (or after resetting local OpenClaw config/workspace)
 pnpm openclaw setup
+
+# Point the poker plugin at your platform for this shell.
+export LANGGRAPH_POKER_URL="https://your-platform.up.railway.app"
 
 # Optional: prebuild Control UI before first startup
 pnpm ui:build
@@ -245,6 +322,14 @@ pnpm ui:build
 # Dev loop (auto-reload on source/config changes)
 pnpm gateway:watch
 ```
+
+PowerShell environment variant:
+
+```powershell
+$env:LANGGRAPH_POKER_URL = "https://your-platform.up.railway.app"
+```
+
+Once the Gateway is running from source, ask your agent to run `poker_setup`, then restart the Gateway so the platform MCP tools are loaded.
 
 If you need a built `dist/` from the checkout (for Node, packaging, or release validation), run:
 
