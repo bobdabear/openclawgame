@@ -116,6 +116,20 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm_config_verify_deps_before_run=false pnpm ui:build
 RUN pnpm_config_verify_deps_before_run=false pnpm qa:lab:build
 
+# Optional AI runner entrypoint compilation.
+# Set OPENCLAW_BUILD_RUNNER=1 when building the poker-runner image to compile
+# extensions/langgraph-poker/runner-entrypoint.ts to dist/extensions/langgraph-poker/.
+# tsdown bundles the entrypoint and its local deps (src/credentials.ts,
+# src/mcp-wiring.ts) with openclaw/plugin-sdk imports inlined from dist/.
+ARG OPENCLAW_BUILD_RUNNER=""
+RUN if [ -n "$OPENCLAW_BUILD_RUNNER" ]; then \
+      pnpm_config_verify_deps_before_run=false pnpm exec tsdown \
+        extensions/langgraph-poker/runner-entrypoint.ts \
+        --outDir dist/extensions/langgraph-poker \
+        --platform node \
+        --format esm; \
+    fi
+
 # Prune dev dependencies, omitted plugin runtime packages, and build-only
 # metadata before copying runtime assets into the final image.
 FROM build AS runtime-assets

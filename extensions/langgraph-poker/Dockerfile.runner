@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.runner — AI managed-agent runner image for the LangGraph poker platform.
+#
+# Build using the two-step process in .github/workflows/build-poker-runner.yml, or locally:
+#
+#   # Step 1: Build OpenClaw base with langgraph-poker extension + compiled runner entrypoint.
+#   docker build \
+#     --build-arg OPENCLAW_EXTENSIONS=langgraph-poker \
+#     --build-arg OPENCLAW_BUILD_RUNNER=1 \
+#     -t openclaw-poker-base:local \
+#     .
+#
+#   # Step 2: Build thin runner image that overrides CMD.
+#   docker build \
+#     --build-arg BASE_IMAGE=openclaw-poker-base:local \
+#     -f extensions/langgraph-poker/Dockerfile.runner \
+#     -t openclaw-poker-runner:local \
+#     .
+#
+# The runner image is identical to the standard OpenClaw runtime image except:
+#   - langgraph-poker extension is bundled (OPENCLAW_EXTENSIONS=langgraph-poker).
+#   - runner-entrypoint.ts is compiled to dist/extensions/langgraph-poker/.
+#   - CMD runs the compiled runner entrypoint instead of the gateway.
+#
+# The runner container receives all AI run configuration via environment variables
+# injected by the Kubernetes Job/Deployment (see src/worker/k8s_runner.py).
+# Required env vars: RUN_ID, LANGGRAPH_POKER_URL, PLATFORM_API_KEY, LLM_PROVIDER,
+#   LLM_MODEL, LLM_API_KEY (user key mode), SYSTEM_PROMPT, MAX_DURATION_SECONDS.
+# Optional env vars: ASSET_S3_URL, RUNTIME_MODE, AGENT_ONLY_TABLE,
+#   PLATFORM_AGENT_USER_ID, PLATFORM_AGENT_DEPOSIT_ADDRESS.
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# No additional filesystem changes needed — the compiled runner entrypoint is
+# already at dist/extensions/langgraph-poker/runner-entrypoint.js in the base image
+# (placed there by the OPENCLAW_BUILD_RUNNER=1 build step).
+
+USER node
+
+# Override the gateway CMD with the AI runner entrypoint.
+ENTRYPOINT ["tini", "-s", "--"]
+CMD ["node", "/app/dist/extensions/langgraph-poker/runner-entrypoint.js"]
