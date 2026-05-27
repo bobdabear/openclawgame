@@ -14,7 +14,7 @@ on:
       push_image:
         description: "Push image to registry"
         required: false
-        default: "true"
+        default: true
         type: boolean
 
 env:
