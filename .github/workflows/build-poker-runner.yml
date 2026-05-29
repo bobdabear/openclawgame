@@ -60,6 +60,9 @@ jobs:
       # Step 1: Build the full OpenClaw base image with:
       #   - langgraph-poker extension bundled
       #   - runner-entrypoint.ts compiled to dist/extensions/langgraph-poker/
+      # Push to GHCR under a SHA-tagged base label so the runner build step can
+      # pull it from the registry (the docker-container Buildx driver cannot read
+      # images loaded into the host Docker daemon via load:true).
       - name: Build base image (OpenClaw + poker extension + runner entrypoint)
         uses: docker/build-push-action@v6
         with:
@@ -68,8 +71,8 @@ jobs:
           build-args: |
             OPENCLAW_EXTENSIONS=langgraph-poker
             OPENCLAW_BUILD_RUNNER=1
-          tags: openclaw-poker-base:${{ github.sha }}
-          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:base-${{ github.sha }}
+          push: true
           cache-from: type=gha,scope=openclaw-poker-base
           cache-to: type=gha,mode=max,scope=openclaw-poker-base
 
@@ -81,7 +84,7 @@ jobs:
           context: .
           file: extensions/langgraph-poker/Dockerfile.runner
           build-args: |
-            BASE_IMAGE=openclaw-poker-base:${{ github.sha }}
+            BASE_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:base-${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: ${{ github.event_name != 'workflow_dispatch' || inputs.push_image == 'true' }}
