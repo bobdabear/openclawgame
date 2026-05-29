@@ -28,16 +28,23 @@
 #   LLM_MODEL, LLM_API_KEY (user key mode), SYSTEM_PROMPT, MAX_DURATION_SECONDS.
 # Optional env vars: ASSET_S3_URL, RUNTIME_MODE, AGENT_ONLY_TABLE,
 #   PLATFORM_AGENT_USER_ID, PLATFORM_AGENT_DEPOSIT_ADDRESS.
+#
+# For Railway persistent-worker mode set:
+#   RUNNER_MODE=worker            — run the poll loop instead of one-shot entrypoint
+#   LANGGRAPH_POKER_URL=<api url> — platform backend URL
+#   AI_RUNNER_SERVICE_KEY=<key>   — shared secret for /internal/runner/* endpoints
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-# No additional filesystem changes needed — the compiled runner entrypoint is
-# already at dist/extensions/langgraph-poker/runner-entrypoint.js in the base image
+# No additional filesystem changes needed — the compiled runner entrypoints are
+# already at dist/extensions/langgraph-poker/ in the base image
 # (placed there by the OPENCLAW_BUILD_RUNNER=1 build step).
 
 USER node
 
 # Override the gateway CMD with the AI runner entrypoint.
+# RUNNER_MODE=worker → persistent poll loop (Railway)
+# RUNNER_MODE unset  → one-shot job (Kubernetes)
 ENTRYPOINT ["tini", "-s", "--"]
-CMD ["node", "/app/dist/extensions/langgraph-poker/runner-entrypoint.js"]
+CMD ["/bin/sh", "-c", "if [ \"$RUNNER_MODE\" = 'worker' ]; then exec node /app/dist/extensions/langgraph-poker/runner-worker.js; else exec node /app/dist/extensions/langgraph-poker/runner-entrypoint.js; fi"]
