@@ -9,7 +9,7 @@ export async function wireMcpServer(creds: PokerCredentials): Promise<void> {
       draft.mcp ??= {};
       draft.mcp.servers ??= {};
       draft.mcp.servers[SERVER_KEY] = {
-        url: `${creds.platform_url}/mcp`,
+        url: `${creds.platform_url}/mcp/`,
         // streamable-http is the preferred MCP HTTP transport
         transport: "streamable-http",
         headers: {
