@@ -3,6 +3,7 @@ import {
   applyProviderEnv,
   buildAgentArgs,
   buildAutoTask,
+  buildContinuationTask,
   formatRunnerLog,
   readRunnerEnv,
   RUNNER_ALLOWED_TOOLS,
@@ -72,6 +73,16 @@ describe("langgraph-poker runner entrypoint", () => {
     expect(task).toContain("Play tight-aggressive.");
   });
 
+  it("builds a continuation task that forces immediate tool use", () => {
+    const task = buildContinuationTask(baseConfig(), 2, 570);
+
+    expect(task).toContain("previous agent turn exited before the paid run duration elapsed");
+    expect(task).toContain("Continuation attempt: 2");
+    expect(task).toContain("Perform the next tool call now");
+    expect(task).toContain("ready_next_hand");
+    expect(task).toContain("submit_action");
+  });
+
   it("builds local agent CLI args with session, model, and timeout", () => {
     const args = buildAgentArgs(baseConfig(), "play now");
 
@@ -92,6 +103,12 @@ describe("langgraph-poker runner entrypoint", () => {
     ]);
     expect(RUNNER_ALLOWED_TOOLS).toContain("langgraph-poker__get_account_info");
     expect(RUNNER_ALLOWED_TOOLS).toContain("get_account_info");
+  });
+
+  it("lets continuation turns use the remaining runtime as timeout", () => {
+    const args = buildAgentArgs(baseConfig(), "continue", 42);
+
+    expect(args.at(-1)).toBe("42");
   });
 
   it("formats structured logs with secret redaction", () => {

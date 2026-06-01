@@ -16,6 +16,8 @@ const REQUIRED_ENV = [
   "MAX_DURATION_SECONDS",
 ] as const;
 const SECRET_VALUE_RE = /\b(?:sk|agk|pk|pat)_[A-Za-z0-9_-]{8,}\b/gi;
+const EARLY_EXIT_REENTRY_DELAY_MS = 5_000;
+const EARLY_EXIT_COMPLETION_GRACE_SECONDS = 15;
 export const RUNNER_ALLOWED_TOOLS = [
   ...[
     "get_account_info",
@@ -119,6 +121,21 @@ export function buildAutoTask(config: RunnerEnv, prompt: string): string {
   ].join("\n");
 }
 
+export function buildContinuationTask(
+  config: RunnerEnv,
+  attempt: number,
+  remainingSeconds: number,
+): string {
+  return [
+    "Continue the managed LangGraph Poker runner session; the previous agent turn exited before the paid run duration elapsed.",
+    `Run id: ${config.runId}. Continuation attempt: ${attempt}. Remaining seconds: ${remainingSeconds}.`,
+    "Do not summarize that you will continue and then stop. Perform the next tool call now.",
+    "Call get_game_state for the current table if seated; if no table is known, call list_tables and rejoin/create per the original instructions.",
+    "If a hand is complete and hand_id is present, call ready_next_hand. If it is your turn, choose a legal action and call submit_action.",
+    "Keep polling/acting until MAX_DURATION_SECONDS is reached, bankroll is effectively bust, or repeated hard errors make continuation impossible.",
+  ].join("\n");
+}
+
 export function redactRunnerLogValue(value: unknown): unknown {
   if (typeof value === "string") {
     return value.replace(SECRET_VALUE_RE, "[REDACTED]");
@@ -179,7 +196,11 @@ export async function prepareRunnerConfig(config: RunnerEnv): Promise<string> {
   return buildAutoTask(config, await appendAssetPrompt(config));
 }
 
-export function buildAgentArgs(config: RunnerEnv, message: string): string[] {
+export function buildAgentArgs(
+  config: RunnerEnv,
+  message: string,
+  timeoutSeconds = config.maxDurationSeconds,
+): string[] {
   return [
     "openclaw.mjs",
     "agent",
@@ -193,23 +214,25 @@ export function buildAgentArgs(config: RunnerEnv, message: string): string[] {
     "--tools",
     RUNNER_ALLOWED_TOOLS.join(","),
     "--timeout",
-    String(config.maxDurationSeconds),
+    String(timeoutSeconds),
   ];
 }
 
-export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number> {
-  const config = readRunnerEnv(env);
-  applyProviderEnv(config, env);
-  logRunnerEvent("ai_runner_starting", {
-    run_id: config.runId,
-    provider: config.llmProvider,
-    model: config.llmModel,
-    runtime_mode: config.runtimeMode,
-    max_duration_seconds: config.maxDurationSeconds,
-  });
-  const message = await prepareRunnerConfig(config);
-  logRunnerEvent("ai_runner_configured", { run_id: config.runId });
-  const child = spawn(process.execPath, buildAgentArgs(config, message), {
+function remainingRunSeconds(deadlineMs: number): number {
+  return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+}
+
+async function waitBeforeReentry(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, EARLY_EXIT_REENTRY_DELAY_MS));
+}
+
+async function runAgentTurn(
+  config: RunnerEnv,
+  message: string,
+  timeoutSeconds: number,
+  env: NodeJS.ProcessEnv,
+): Promise<number> {
+  const child = spawn(process.execPath, buildAgentArgs(config, message, timeoutSeconds), {
     stdio: "inherit",
     env,
   });
@@ -223,6 +246,49 @@ export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number
       resolve(1);
     });
   });
+}
+
+export async function main(env: NodeJS.ProcessEnv = process.env): Promise<number> {
+  const config = readRunnerEnv(env);
+  applyProviderEnv(config, env);
+  logRunnerEvent("ai_runner_starting", {
+    run_id: config.runId,
+    provider: config.llmProvider,
+    model: config.llmModel,
+    runtime_mode: config.runtimeMode,
+    max_duration_seconds: config.maxDurationSeconds,
+  });
+  let message = await prepareRunnerConfig(config);
+  logRunnerEvent("ai_runner_configured", { run_id: config.runId });
+  const deadlineMs = Date.now() + config.maxDurationSeconds * 1000;
+  let attempt = 1;
+
+  for (;;) {
+    const timeoutSeconds = remainingRunSeconds(deadlineMs);
+    if (timeoutSeconds <= 0) {
+      logRunnerEvent("ai_runner_duration_elapsed", { run_id: config.runId });
+      return 0;
+    }
+
+    const exitCode = await runAgentTurn(config, message, timeoutSeconds, env);
+    if (exitCode !== 0) {
+      return exitCode;
+    }
+
+    const remainingSeconds = remainingRunSeconds(deadlineMs);
+    if (remainingSeconds <= EARLY_EXIT_COMPLETION_GRACE_SECONDS) {
+      return 0;
+    }
+
+    attempt += 1;
+    logRunnerEvent("ai_runner_reentering_after_early_exit", {
+      run_id: config.runId,
+      attempt,
+      remaining_seconds: remainingSeconds,
+    });
+    await waitBeforeReentry();
+    message = buildContinuationTask(config, attempt, remainingSeconds);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
