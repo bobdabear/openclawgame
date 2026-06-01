@@ -16,6 +16,34 @@ const REQUIRED_ENV = [
   "MAX_DURATION_SECONDS",
 ] as const;
 const SECRET_VALUE_RE = /\b(?:sk|agk|pk|pat)_[A-Za-z0-9_-]{8,}\b/gi;
+export const RUNNER_ALLOWED_TOOLS = [
+  ...[
+    "get_account_info",
+    "list_tables",
+    "create_table",
+    "join_table",
+    "get_game_state",
+    "submit_action",
+    "ready_next_hand",
+    "leave_table",
+  ],
+  // Embedded runtime MCP tools are registered as <server>__<tool> names.
+  // Include both canonical and normalized server prefixes so an internal
+  // naming change does not strand queued paid runs in immediate failure.
+  ...["langgraph-poker", "langgraph_poker", "mcp__langgraph-poker", "mcp__langgraph_poker"].flatMap(
+    (prefix) =>
+      [
+        "get_account_info",
+        "list_tables",
+        "create_table",
+        "join_table",
+        "get_game_state",
+        "submit_action",
+        "ready_next_hand",
+        "leave_table",
+      ].map((tool) => `${prefix}__${tool}`),
+  ),
+] as const;
 
 export type RunnerEnv = {
   runId: string;
@@ -162,6 +190,8 @@ export function buildAgentArgs(config: RunnerEnv, message: string): string[] {
     message,
     "--model",
     `${config.llmProvider}/${config.llmModel}`,
+    "--tools",
+    RUNNER_ALLOWED_TOOLS.join(","),
     "--timeout",
     String(config.maxDurationSeconds),
   ];

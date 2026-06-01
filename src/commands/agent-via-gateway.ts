@@ -74,6 +74,7 @@ type AgentCliOpts = {
   lane?: string;
   runId?: string;
   extraSystemPrompt?: string;
+  tools?: string;
   local?: boolean;
 };
 
@@ -115,6 +116,17 @@ function parseTimeoutSeconds(opts: { cfg: OpenClawConfig; timeout?: string }) {
     );
   }
   return raw;
+}
+
+function parseAgentToolsAllow(input: unknown): string[] | undefined {
+  if (typeof input !== "string") {
+    return undefined;
+  }
+  const entries = input
+    .split(/[\s,]+/u)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return entries.length > 0 ? Array.from(new Set(entries)) : undefined;
 }
 
 function formatPayloadForLog(payload: {
@@ -702,6 +714,7 @@ export async function agentCliCommand(
   protectJsonStdout(opts);
   const dispatchOpts = normalizeSessionKeyOptsForDispatch(opts);
   validateExplicitSessionKeyForDispatch(dispatchOpts);
+  const toolsAllow = parseAgentToolsAllow(dispatchOpts.tools);
   const gatewayDispatchOpts = dispatchOpts.runId
     ? dispatchOpts
     : { ...dispatchOpts, runId: randomIdempotencyKey() };
@@ -713,6 +726,7 @@ export async function agentCliCommand(
     cleanupBundleMcpOnRunEnd: true,
     cleanupCliLiveSessionOnRunEnd: true,
     abortSignal: signalBridge.signal,
+    ...(toolsAllow ? { toolsAllow } : {}),
   };
   try {
     if (dispatchOpts.local === true) {

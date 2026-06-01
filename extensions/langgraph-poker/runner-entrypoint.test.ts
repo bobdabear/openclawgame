@@ -5,6 +5,7 @@ import {
   buildAutoTask,
   formatRunnerLog,
   readRunnerEnv,
+  RUNNER_ALLOWED_TOOLS,
   type RunnerEnv,
 } from "./runner-entrypoint.js";
 
@@ -84,9 +85,13 @@ describe("langgraph-poker runner entrypoint", () => {
       "play now",
       "--model",
       "openai/gpt-4o",
+      "--tools",
+      RUNNER_ALLOWED_TOOLS.join(","),
       "--timeout",
       "600",
     ]);
+    expect(RUNNER_ALLOWED_TOOLS).toContain("langgraph-poker__get_account_info");
+    expect(RUNNER_ALLOWED_TOOLS).toContain("get_account_info");
   });
 
   it("formats structured logs with secret redaction", () => {
