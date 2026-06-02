@@ -54,9 +54,16 @@ interface ClaimResponseData {
 }
 
 async function claimNextRun(): Promise<ClaimResponseData | null> {
+  // Include the Railway-injected service ID so the backend can associate this
+  // service with the claimed run for targeted deletion on completion.
+  // Falls back to empty string outside Railway (local dev, k8s) — backend ignores it.
+  const railwayServiceId = process.env["RAILWAY_SERVICE_ID"] ?? "";
   const resp = await fetch(`${PLATFORM_URL}/api/v1/internal/runner/claim`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: {
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...(railwayServiceId ? { "X-Railway-Service-Id": railwayServiceId } : {}),
+    },
   });
   if (!resp.ok) {
     throw new Error(`claim request failed: HTTP ${resp.status}`);
